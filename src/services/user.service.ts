@@ -20,13 +20,49 @@ export class UserService {
       const decodedToken = await this.firebaseService.verifyToken(token);
       console.log('✅ Token decoded successfully, UID:', decodedToken.uid);
       
-      const user = await this.userRepository.findOne({ where: { uid: decodedToken.uid } });
+      // Buscar usuario existente
+      let user = await this.userRepository.findOne({ where: { uid: decodedToken.uid } });
       console.log('🔍 User lookup result:', user ? 'Found' : 'Not found');
       
       if (!user) {
+        console.log('📝 Usuario no encontrado, creando automáticamente...');
+        
+        // Verificar que el token tenga email
+        if (!decodedToken.email) {
+          return {
+            isValid: false,
+            error: 'Token de Firebase no contiene información de email'
+          };
+        }
+        
+        // Verificar si el email está autorizado
+        if (!this.isEmailAllowed(decodedToken.email)) {
+          console.log(`❌ Email ${decodedToken.email} no está autorizado`);
+          return {
+            isValid: false,
+            error: 'Dominio de correo no autorizado para acceder al sistema'
+          };
+        }
+
+        // Crear usuario automáticamente
+        const role = this.determineUserRole(decodedToken.email);
+        user = this.userRepository.create({
+          uid: decodedToken.uid,
+          email: decodedToken.email,
+          rol: role,
+          nombre_completo: decodedToken.name || decodedToken.email.split('@')[0],
+        });
+
+        user = await this.userRepository.save(user);
+        console.log(`✅ Usuario creado automáticamente con rol: ${role}`);
+      }
+
+      // Verificar si el email del usuario sigue siendo válido
+      if (!this.isEmailAllowed(user.email)) {
+        console.log(`❌ Email ${user.email} ya no está autorizado`);
         return {
           isValid: false,
-          error: 'Usuario no encontrado en la base de datos local'
+          error: 'Dominio de correo no autorizado para acceder al sistema'
         };
       }
 
@@ -53,8 +89,14 @@ export class UserService {
         throw new BadRequestException('Usuario ya existe');
       }
 
+      // Verificar si el dominio del email está permitido
+      if (!this.isEmailAllowed(createUserDto.email)) {
+        throw new BadRequestException('Dominio de correo no autorizado para acceder al sistema');
+      }
+
       // Determinar el rol basado en el email
       const role = this.determineUserRole(createUserDto.email);
+      console.log(`📧 Email: ${createUserDto.email} → Rol asignado: ${role}`);
 
       const user = this.userRepository.create({
         uid: decodedToken.uid,
@@ -88,16 +130,43 @@ export class UserService {
     return (result.affected ?? 0) > 0;
   }
 
-  private determineUserRole(email: string): UserRole {
+  private isEmailAllowed(email: string): boolean {
+    console.log(`🔍 Verificando si el email está permitido: ${email}`);
+    
+    // Correo específico permitido
     if (email === 'silasglauco@gmail.com') {
+      console.log(`✅ Email específico autorizado`);
+      return true;
+    }
+    
+    // Dominio de alumnos UCN permitido
+    if (email.endsWith('@alumnos.ucn.cl')) {
+      console.log(`✅ Dominio @alumnos.ucn.cl autorizado`);
+      return true;
+    }
+    
+    // Cualquier otro dominio no está permitido
+    console.log(`❌ Dominio no autorizado`);
+    return false;
+  }
+
+  private determineUserRole(email: string): UserRole {
+    console.log(`🔍 Determinando rol para email: ${email}`);
+    
+    // Correo específico para rol administrativo
+    if (email === 'silasglauco@gmail.com') {
+      console.log(`✅ Email específico detectado → ADMIN`);
       return UserRole.ADMIN;
     }
     
+    // Correos de alumnos UCN son tutores
     if (email.endsWith('@alumnos.ucn.cl')) {
+      console.log(`✅ Dominio @alumnos.ucn.cl detectado → TUTOR`);
       return UserRole.TUTOR;
     }
     
-    // Por defecto, asignar rol de tutor si no cumple las condiciones específicas
-    return UserRole.TUTOR;
+    // Este caso no debería ocurrir ya que isEmailAllowed lo previene
+    console.log(`⚠️ Email no reconocido, esto no debería pasar`);
+    throw new Error('Dominio de correo no autorizado');
   }
 }

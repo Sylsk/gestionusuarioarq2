@@ -37,30 +37,42 @@ export class UserController {
     try {
       // gRPC convierte snake_case a camelCase automáticamente
       const token = (data as any).firebaseToken || data.firebase_token;
-      console.log('🔍 gRPC ValidateUser called with token length:', token?.length);
-      console.log('🔑 Token prefix:', token?.substring(0, 20) + '...');
+      console.log(' gRPC ValidateUser called with token length:', token?.length);
+      console.log(' Token prefix:', token?.substring(0, 20) + '...');
       
       const result = await this.userService.validateUser(token);
       
       console.log('✅ ValidateUser result:', { isValid: result.isValid, hasUser: !!result.user, error: result.error });
       
+      // Si no es válido, devolver sin usuario
+      if (!result.isValid || !result.user) {
+        const errorResponse = {
+          is_valid: false,
+          error_message: result.error || 'Usuario no válido',
+          // No incluir campo user cuando no hay usuario válido
+        };
+        console.log('❌ Returning error response:', JSON.stringify(errorResponse, null, 2));
+        return errorResponse;
+      }
+      
+      // Si es válido, devolver datos completos
       const response = {
-        is_valid: result.isValid,
-        user: result.user ? {
+        is_valid: true,
+        user: {
           uid: result.user.uid,
           email: result.user.email,
           rol: result.user.rol,
           nombre_completo: result.user.nombre_completo,
           created_at: result.user.created_at.toISOString(),
           updated_at: result.user.updated_at.toISOString(),
-        } : null,
-        error_message: result.error || '',
+        },
+        error_message: "",
       };
       
-      console.log('🚀 Returning response:', JSON.stringify(response, null, 2));
+      console.log('✅ Returning success response:', JSON.stringify(response, null, 2));
       return response;
     } catch (error) {
-      console.error('❌ gRPC ValidateUser error:', error.message);
+      console.error(' gRPC ValidateUser error:', error.message);
       return {
         is_valid: false,
         user: null,

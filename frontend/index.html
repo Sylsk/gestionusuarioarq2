@@ -61,6 +61,20 @@
             border-radius: 5px;
             margin: 10px 0;
         }
+        .role-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        .role-authorized {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        }
+        .role-unauthorized {
+            background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
+        }
         .loading {
             display: none;
             text-align: center;
@@ -78,12 +92,17 @@
 <body>
     <div class="container">
         <h1>🔐 User Management Service</h1>
-        <p><strong>Prueba de integración Google Sign-In + Backend NestJS</strong></p>
+        <p><strong>Sistema de Login con Google Sign-In + Validación de Roles</strong></p>
         
         <div class="login-section">
             <h3>Iniciar Sesión con Google</h3>
+            <p style="font-size: 14px; color: #666; margin: 10px 0;">
+                ✅ <strong>Dominios autorizados:</strong><br>
+                • silasglauco@gmail.com (Admin)<br>
+                • @alumnos.ucn.cl (Tutor)
+            </p>
             <button id="googleSignIn" class="google-btn">
-                📧 Iniciar sesión con Google
+                � Iniciar sesión con Google (Firebase)
             </button>
             <button id="signOut" class="google-btn" style="display:none; background-color: #dc3545;">
                 🚪 Cerrar Sesión
@@ -99,89 +118,166 @@
             <div id="userDetails"></div>
         </div>
 
+        <div id="tokenInfo" style="display:none;" class="result-section">
+            <h4>🔑 Token de Firebase (para Postman/gRPC):</h4>
+            <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                <button onclick="copyToken()" style="background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; margin-bottom: 10px;">
+                    📋 Copiar Token
+                </button>
+                <textarea id="firebaseToken" readonly style="width: 100%; height: 120px; font-family: monospace; font-size: 11px; resize: vertical; border: 1px solid #ddd; padding: 5px; border-radius: 3px;"></textarea>
+            </div>
+            <p style="font-size: 12px; color: #666;">
+                ⚠️ <strong>Nota:</strong> Este token expira después de 1 hora. Úsalo en Postman para probar las llamadas gRPC.
+            </p>
+        </div>
+
         <div id="result" class="result-section" style="display:none;">
             <h4>📡 Respuesta del Backend:</h4>
             <div id="resultContent"></div>
         </div>
 
         <div style="margin-top: 30px;">
-            <h4>🔧 Estado de Servicios:</h4>
+            <h4>🔧 Testing y Herramientas:</h4>
             <button onclick="testHealth()" class="google-btn" style="background-color: #17a2b8;">
                 ✅ Test Health Check
             </button>
             <button onclick="testDatabase()" class="google-btn" style="background-color: #28a745;">
                 🗄️ Test Database
             </button>
+            <button onclick="showGrpcInstructions()" class="google-btn" style="background-color: #6f42c1;">
+                📋 Instrucciones gRPC/Postman
+            </button>
+        </div>
+
+        <div id="grpcInstructions" style="display:none; margin-top: 20px;" class="result-section">
+            <h4>📡 Instrucciones para probar con Postman/gRPC:</h4>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 12px;">
+                <p><strong>🎯 Endpoint gRPC:</strong> localhost:50051</p>
+                <p><strong>📋 Ejemplo de llamada ValidateUser:</strong></p>
+                <pre style="background: #e9ecef; padding: 10px; border-radius: 3px; margin: 5px 0;">
+{
+  "firebase_token": "[COPIA EL TOKEN DE ARRIBA]"
+}</pre>
+                <p><strong>📋 Ejemplo de llamada CreateUser:</strong></p>
+                <pre style="background: #e9ecef; padding: 10px; border-radius: 3px; margin: 5px 0;">
+{
+  "firebase_token": "[COPIA EL TOKEN DE ARRIBA]",
+  "email": "tu-email@ejemplo.com",
+  "nombre_completo": "Tu Nombre Completo"
+}</pre>
+                <p><strong>🚀 Servicios disponibles:</strong></p>
+                <ul style="margin: 10px 0;">
+                    <li>user_management.UserService/ValidateUser</li>
+                    <li>user_management.UserService/CreateUser</li>
+                    <li>user_management.UserService/GetUserByUid</li>
+                    <li>user_management.UserService/UpdateUserRole</li>
+                    <li>user_management.UserService/DeleteUser</li>
+                </ul>
+            </div>
         </div>
     </div>
 
-    <!-- Google Sign-In API -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     
     <script>
+        // Configuración Firebase - debe coincidir con el backend
+        const firebaseConfig = {
+            apiKey: "AIzaSyAW3zxRYY2t4ddtdU3YfehbhNzTfDob3YQ",
+            authDomain: "loginsalastutores.firebaseapp.com",
+            projectId: "loginsalastutores",
+            appId: "1:355538515261:web:92aa4016d2de359af4c154"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        
         // Configuración
-        const GOOGLE_CLIENT_ID = '355538515261-0u6jtjuf1c99pm04th96h0l524a4c4e3.apps.googleusercontent.com';
         const BACKEND_URL = 'http://localhost:3000/api/test';
         
         let currentUser = null;
+        let currentToken = null;
 
-        // Inicializar Google Sign-In cuando se carga la página
+        // Inicializar Firebase Auth cuando se carga la página
         window.onload = function() {
-            console.log('🚀 Inicializando Google Sign-In...');
+            console.log('🚀 Inicializando Firebase Auth...');
             
-            // Inicializar Google Identity Services
-            google.accounts.id.initialize({
-                client_id: GOOGLE_CLIENT_ID,
-                callback: handleCredentialResponse,
-                auto_select: false,
-                cancel_on_tap_outside: true
+            // Configurar proveedor de Google
+            const provider = new firebase.auth.GoogleAuthProvider();
+            provider.addScope('email');
+            provider.addScope('profile');
+            
+            // Configurar el botón de login
+            document.getElementById('googleSignIn').addEventListener('click', async function() {
+                try {
+                    showLoading(true);
+                    console.log('🔑 Iniciando login con Google...');
+                    
+                    const result = await auth.signInWithPopup(provider);
+                    const user = result.user;
+                    const token = await user.getIdToken();
+                    
+                    console.log('✅ Login exitoso, obteniendo token...');
+                    await handleFirebaseUser(user, token);
+                    
+                } catch (error) {
+                    console.error('❌ Error en login:', error);
+                    showResult(`Error en login: ${error.message}`, 'error');
+                } finally {
+                    showLoading(false);
+                }
             });
 
-            // Renderizar el botón de Google
-            google.accounts.id.renderButton(
-                document.getElementById('googleSignIn'),
-                {
-                    theme: 'outline',
-                    size: 'large',
-                    text: 'signin_with',
-                    shape: 'rectangular'
-                }
-            );
-
-            console.log('✅ Google Sign-In inicializado');
+            console.log('✅ Firebase Auth inicializado');
         };
 
-        // Manejar la respuesta de Google Sign-In
-        async function handleCredentialResponse(response) {
-            console.log('🔑 Token recibido de Google:', response.credential);
+        // Manejar usuario autenticado de Firebase
+        async function handleFirebaseUser(user, token) {
+            console.log('👤 Usuario Firebase:', user);
+            console.log('🔑 Token Firebase:', token);
             
             try {
-                showLoading(true);
+                // Guardar token globalmente
+                currentToken = token;
+                window.currentFirebaseToken = token;
                 
-                // Decodificar el JWT para obtener información del usuario
-                const userInfo = parseJwt(response.credential);
-                console.log('👤 Información del usuario:', userInfo);
+                // Mostrar el token para uso en Postman
+                showFirebaseToken(token);
+                
+                // Preparar información del usuario
+                const userInfo = {
+                    name: user.displayName,
+                    email: user.email,
+                    picture: user.photoURL,
+                    uid: user.uid
+                };
                 
                 // Mostrar información del usuario
                 displayUserInfo(userInfo);
                 
                 // Enviar token al backend
-                await sendTokenToBackend(response.credential, userInfo);
+                await sendTokenToBackend(token, userInfo);
                 
             } catch (error) {
-                console.error('❌ Error:', error);
+                console.error('❌ Error procesando usuario:', error);
                 showResult(`Error: ${error.message}`, 'error');
-            } finally {
-                showLoading(false);
             }
         }
 
-        // Enviar token al backend
+        // Manejar la respuesta de Google Sign-In (función legacy - mantener para compatibilidad)
+        async function handleCredentialResponse(response) {
+            // Esta función ya no se usa con Firebase Auth
+            console.log('⚠️ handleCredentialResponse llamado pero no se usa con Firebase Auth');
+        }
+
+        // Enviar token al backend para LOGIN (no crear usuario)
         async function sendTokenToBackend(token, userInfo) {
             try {
-                console.log('📡 Enviando token al backend...');
+                console.log('� Iniciando sesión con el backend...');
                 
-                const response = await fetch(`${BACKEND_URL}/create-user`, {
+                const response = await fetch(`${BACKEND_URL}/login`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -194,18 +290,65 @@
                 });
 
                 const result = await response.json();
-                console.log('📥 Respuesta del backend:', result);
+                console.log('📥 Respuesta del login:', result);
                 
                 if (result.success) {
-                    showResult(`✅ Usuario procesado exitosamente!<br>
-                               <strong>Email:</strong> ${result.user?.email || userInfo.email}<br>
-                               <strong>UID:</strong> ${result.user?.uid}<br>
-                               <strong>Mensaje:</strong> ${result.message}`, 'success');
+                    // Actualizar el rol confirmado del backend
+                    const confirmedRoleElement = document.getElementById('confirmedRole');
+                    if (confirmedRoleElement && result.user?.rol) {
+                        const roleIcon = result.user.rol === 'Admin' ? '🔑' : '👨‍🎓';
+                        confirmedRoleElement.innerHTML = `${roleIcon} ${result.user.rol} ✅`;
+                        
+                        // Actualizar la clase del contenedor de rol
+                        const roleContainer = confirmedRoleElement.closest('.role-info');
+                        if (roleContainer) {
+                            roleContainer.className = 'role-info role-authorized';
+                        }
+                    }
+
+                    // Determinar el mensaje basado en el tipo de acción
+                    let actionMessage = '';
+                    if (result.source === 'existing_user') {
+                        actionMessage = '🔐 Inicio de sesión exitoso (usuario existente)';
+                    } else if (result.source === 'new_user') {
+                        actionMessage = '👋 ¡Bienvenido! Usuario registrado y logueado';
+                    } else if (result.source === 'mock') {
+                        actionMessage = '🧪 Login de prueba (modo desarrollo)';
+                    } else {
+                        actionMessage = '✅ Login exitoso';
+                    }
+                    
+                    showResult(`${actionMessage}<br>
+                               <strong>👤 Nombre:</strong> ${result.user?.nombre_completo || userInfo.name}<br>
+                               <strong>📧 Email:</strong> ${result.user?.email || userInfo.email}<br>
+                               <strong>🎯 Rol:</strong> ${result.user?.rol || 'No definido'}<br>
+                               <strong>🆔 UID:</strong> ${result.user?.uid}<br>
+                               <strong>📅 Creado:</strong> ${result.user?.created_at ? new Date(result.user.created_at).toLocaleString() : 'N/A'}<br>
+                               <strong>🔄 Tipo:</strong> ${result.source || 'Backend'}<br>
+                               <strong>💬 Info:</strong> ${result.message}`, 'success');
                     
                     currentUser = result.user;
                     document.getElementById('signOut').style.display = 'inline-block';
                 } else {
-                    showResult(`⚠️ ${result.message || result.error_message}`, 'error');
+                    // Si hay error, mostrar el rol como no autorizado
+                    const confirmedRoleElement = document.getElementById('confirmedRole');
+                    if (confirmedRoleElement) {
+                        confirmedRoleElement.innerHTML = '❌ ACCESO DENEGADO';
+                        
+                        // Actualizar la clase del contenedor de rol
+                        const roleContainer = confirmedRoleElement.closest('.role-info');
+                        if (roleContainer) {
+                            roleContainer.className = 'role-info role-unauthorized';
+                        }
+                    }
+                    
+                    showResult(`🚫 Acceso Denegado<br>
+                               <strong>❌ Error:</strong> ${result.message || result.error_message}<br>
+                               <strong>📧 Email:</strong> ${userInfo.email}<br>
+                               <strong⚠️ Motivo:</strong> Este dominio de correo no está autorizado para acceder al sistema.<br>
+                               <strong> Dominios Permitidos:</strong><br>
+                               • silasglauco@gmail.com (Admin)<br>
+                               • @alumnos.ucn.cl (Tutor)`, 'error');
                 }
                 
             } catch (error) {
@@ -225,13 +368,36 @@
         }
 
         function displayUserInfo(userInfo) {
+            // Determinar el rol basado en el email (lógica del frontend)
+            const predictedRole = determineUserRole(userInfo.email);
+            const isAuthorized = predictedRole !== '❌ NO AUTORIZADO';
+            
             document.getElementById('userDetails').innerHTML = `
                 <strong>Nombre:</strong> ${userInfo.name}<br>
                 <strong>Email:</strong> ${userInfo.email}<br>
                 <strong>Foto:</strong> <img src="${userInfo.picture}" width="50" style="border-radius: 50%;"><br>
-                <strong>Google ID:</strong> ${userInfo.sub}
+                <strong>Firebase UID:</strong> ${userInfo.uid}<br><br>
+                
+                <div class="role-info ${isAuthorized ? 'role-authorized' : 'role-unauthorized'}">
+                    <strong>🎯 Estado de Autorización</strong><br>
+                    <strong>Rol Previsto:</strong> ${predictedRole}<br>
+                    <strong>Rol del Backend:</strong> <span id="confirmedRole">⏳ Verificando...</span>
+                </div>
             `;
             document.getElementById('userInfo').style.display = 'block';
+        }
+
+        // Función para determinar el rol basado en el email (misma lógica del backend)
+        function determineUserRole(email) {
+            if (email === 'silasglauco@gmail.com') {
+                return '🔑 ADMIN';
+            }
+            
+            if (email.endsWith('@alumnos.ucn.cl')) {
+                return '👨‍🎓 TUTOR';
+            }
+            
+            return '❌ NO AUTORIZADO';
         }
 
         function showResult(message, type = 'info') {
@@ -247,14 +413,48 @@
             document.getElementById('loading').style.display = show ? 'block' : 'none';
         }
 
+        // Mostrar el token de Firebase para uso en Postman
+        function showFirebaseToken(token) {
+            document.getElementById('firebaseToken').value = token;
+            document.getElementById('tokenInfo').style.display = 'block';
+        }
+
+        // Copiar token al portapapeles
+        function copyToken() {
+            const tokenTextarea = document.getElementById('firebaseToken');
+            tokenTextarea.select();
+            tokenTextarea.setSelectionRange(0, 99999); // Para móviles
+            
+            try {
+                document.execCommand('copy');
+                showResult('✅ Token copiado al portapapeles! Ya puedes usarlo en Postman.', 'success');
+            } catch (err) {
+                console.error('Error copiando token:', err);
+                showResult('❌ Error copiando token. Selecciona y copia manualmente.', 'error');
+            }
+        }
+
         // Cerrar sesión
-        document.getElementById('signOut').addEventListener('click', function() {
-            google.accounts.id.disableAutoSelect();
-            currentUser = null;
-            document.getElementById('userInfo').style.display = 'none';
-            document.getElementById('result').style.display = 'none';
-            document.getElementById('signOut').style.display = 'none';
-            showResult('👋 Sesión cerrada', 'info');
+        document.getElementById('signOut').addEventListener('click', async function() {
+            try {
+                await auth.signOut();
+                console.log('👋 Sesión cerrada en Firebase');
+                
+                currentUser = null;
+                currentToken = null;
+                window.currentFirebaseToken = null;
+                
+                document.getElementById('userInfo').style.display = 'none';
+                document.getElementById('tokenInfo').style.display = 'none';
+                document.getElementById('result').style.display = 'none';
+                document.getElementById('signOut').style.display = 'none';
+                document.getElementById('firebaseToken').value = '';
+                
+                showResult('👋 Sesión cerrada exitosamente', 'info');
+            } catch (error) {
+                console.error('❌ Error cerrando sesión:', error);
+                showResult(`Error cerrando sesión: ${error.message}`, 'error');
+            }
         });
 
         // Funciones de testing
@@ -281,6 +481,17 @@
                 showResult(`❌ Error en Database Test: ${error.message}`, 'error');
             } finally {
                 showLoading(false);
+            }
+        }
+
+        // Mostrar instrucciones para gRPC/Postman
+        function showGrpcInstructions() {
+            const instructionsDiv = document.getElementById('grpcInstructions');
+            if (instructionsDiv.style.display === 'none') {
+                instructionsDiv.style.display = 'block';
+                showResult('📋 Instrucciones mostradas. Usa el token de arriba para las pruebas gRPC.', 'info');
+            } else {
+                instructionsDiv.style.display = 'none';
             }
         }
     </script>
