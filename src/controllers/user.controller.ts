@@ -42,41 +42,67 @@ export class UserController {
       
       const result = await this.userService.validateUser(token);
       
-      console.log('✅ ValidateUser result:', { isValid: result.isValid, hasUser: !!result.user, error: result.error });
+      console.log(' ValidateUser result:', { isValid: result.isValid, hasUser: !!result.user, error: result.error });
       
-      // Si no es válido, devolver sin usuario
+      // Si no es válido, devolver sin usuario (objeto vacío)
       if (!result.isValid || !result.user) {
         const errorResponse = {
-          is_valid: false,
-          error_message: result.error || 'Usuario no válido',
-          // No incluir campo user cuando no hay usuario válido
+          isValid: 0, // 0 = false
+          user: {
+            uid: "",
+            email: "",
+            rol: "",
+            nombreCompleto: "",
+            createdAt: "",
+            updatedAt: "",
+          },
+          errorMessage: result.error || 'Usuario no válido',
         };
-        console.log('❌ Returning error response:', JSON.stringify(errorResponse, null, 2));
+        console.log(' Returning error response:', JSON.stringify(errorResponse, null, 2));
         return errorResponse;
       }
       
       // Si es válido, devolver datos completos
+      console.log(' Raw user data from DB:', {
+        uid: result.user.uid,
+        email: result.user.email,
+        rol: result.user.rol,
+        nombre_completo: result.user.nombre_completo,
+        created_at: result.user.created_at,
+        updated_at: result.user.updated_at,
+      });
+      
       const response = {
-        is_valid: true,
+        isValid: 1, // 1 = true
         user: {
-          uid: result.user.uid,
-          email: result.user.email,
-          rol: result.user.rol,
-          nombre_completo: result.user.nombre_completo,
-          created_at: result.user.created_at.toISOString(),
-          updated_at: result.user.updated_at.toISOString(),
+          uid: String(result.user.uid),
+          email: String(result.user.email),
+          rol: String(result.user.rol),
+          nombreCompleto: String(result.user.nombre_completo),
+          createdAt: String(result.user.created_at.toISOString()),
+          updatedAt: String(result.user.updated_at.toISOString()),
         },
-        error_message: "",
+        errorMessage: "",
       };
       
-      console.log('✅ Returning success response:', JSON.stringify(response, null, 2));
+      console.log(' Final response object:', JSON.stringify(response, null, 2));
+      
+      console.log(' Returning success response:', JSON.stringify(response, null, 2));
+      console.log(' isValid type:', typeof response.isValid, 'value:', response.isValid);
       return response;
     } catch (error) {
       console.error(' gRPC ValidateUser error:', error.message);
       return {
-        is_valid: false,
-        user: null,
-        error_message: error.message,
+        isValid: 0, // 0 = false
+        user: {
+          uid: "",
+          email: "",
+          rol: "",
+          nombreCompleto: "",
+          createdAt: "",
+          updatedAt: "",
+        },
+        errorMessage: error.message,
       };
     }
   }

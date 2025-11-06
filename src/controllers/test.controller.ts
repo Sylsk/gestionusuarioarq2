@@ -14,7 +14,7 @@ export class TestController {
     nombre_completo: string; 
   }) {
     try {
-      console.log('🔐 Intento de login:', {
+      console.log(' Intento de login:', {
         email: body.email,
         nombre_completo: body.nombre_completo,
         hasToken: !!body.firebase_token
@@ -22,7 +22,7 @@ export class TestController {
 
       // Verificar primero si el email está autorizado
       if (!this.isEmailAllowed(body.email)) {
-        console.log(`❌ Email no autorizado: ${body.email}`);
+        console.log(` Email no autorizado: ${body.email}`);
         return {
           success: false,
           error_message: 'Dominio de correo no autorizado para acceder al sistema',
@@ -32,11 +32,11 @@ export class TestController {
 
       try {
         // 1. Primero intentar VALIDAR si el usuario ya existe
-        console.log('🔍 Validando usuario existente...');
+        console.log(' Validando usuario existente...');
         const validationResult = await this.userService.validateUser(body.firebase_token);
         
         if (validationResult.isValid && validationResult.user) {
-          console.log('✅ Usuario existente encontrado y validado');
+          console.log(' Usuario existente encontrado y validado');
           return {
             success: true,
             user: validationResult.user,
@@ -46,7 +46,7 @@ export class TestController {
         }
 
         // 2. Si no existe, intentar CREAR el usuario
-        console.log('📝 Usuario no existe, creando nuevo usuario...');
+        console.log(' Usuario no existe, creando nuevo usuario...');
         const createRequest = {
           firebase_token: body.firebase_token,
           email: body.email,
@@ -63,7 +63,7 @@ export class TestController {
         };
 
       } catch (firebaseError) {
-        console.error('❌ Error con Firebase:', firebaseError.message);
+        console.error(' Error con Firebase:', firebaseError.message);
         
         // Si falla Firebase, crear usuario mock para testing
         const uid = `mock-${Date.now()}`;
@@ -85,7 +85,7 @@ export class TestController {
       }
 
     } catch (error) {
-      console.error('❌ Error general en login:', error);
+      console.error(' Error general en login:', error);
       return {
         success: false,
         error_message: `Error en login: ${error.message}`
@@ -290,7 +290,7 @@ export class TestController {
     }
     
     // Este caso no debería ocurrir ya que isEmailAllowed lo previene
-    console.log(`⚠️ Email no reconocido, esto no debería pasar`);
+    console.log(` Email no reconocido, esto no debería pasar`);
     throw new Error('Dominio de correo no autorizado');
   }
 }
