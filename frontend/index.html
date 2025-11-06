@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - Google Login</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .login-section {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .google-btn {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .google-btn:hover {
+            background-color: #357ae8;
+        }
+        .result-section {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #4285f4;
+        }
+        .success {
+            border-left-color: #28a745;
+            background-color: #d4edda;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        .user-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 User Management Service</h1>
+        <p><strong>Prueba de integración Google Sign-In + Backend NestJS</strong></p>
+        
+        <div class="login-section">
+            <h3>Iniciar Sesión con Google</h3>
+            <button id="googleSignIn" class="google-btn">
+                📧 Iniciar sesión con Google
+            </button>
+            <button id="signOut" class="google-btn" style="display:none; background-color: #dc3545;">
+                🚪 Cerrar Sesión
+            </button>
+        </div>
+
+        <div class="loading" id="loading">
+            <p>⏳ Procesando...</p>
+        </div>
+
+        <div id="userInfo" style="display:none;" class="user-info">
+            <h4>👤 Información del Usuario:</h4>
+            <div id="userDetails"></div>
+        </div>
+
+        <div id="result" class="result-section" style="display:none;">
+            <h4>📡 Respuesta del Backend:</h4>
+            <div id="resultContent"></div>
+        </div>
+
+        <div style="margin-top: 30px;">
+            <h4>🔧 Estado de Servicios:</h4>
+            <button onclick="testHealth()" class="google-btn" style="background-color: #17a2b8;">
+                ✅ Test Health Check
+            </button>
+            <button onclick="testDatabase()" class="google-btn" style="background-color: #28a745;">
+                🗄️ Test Database
+            </button>
+        </div>
+    </div>
+
+    <!-- Google Sign-In API -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
+    <script>
+        // Configuración
+        const GOOGLE_CLIENT_ID = '355538515261-0u6jtjuf1c99pm04th96h0l524a4c4e3.apps.googleusercontent.com';
+        const BACKEND_URL = 'http://localhost:3000/api/test';
+        
+        let currentUser = null;
+
+        // Inicializar Google Sign-In cuando se carga la página
+        window.onload = function() {
+            console.log('🚀 Inicializando Google Sign-In...');
+            
+            // Inicializar Google Identity Services
+            google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: handleCredentialResponse,
+                auto_select: false,
+                cancel_on_tap_outside: true
+            });
+
+            // Renderizar el botón de Google
+            google.accounts.id.renderButton(
+                document.getElementById('googleSignIn'),
+                {
+                    theme: 'outline',
+                    size: 'large',
+                    text: 'signin_with',
+                    shape: 'rectangular'
+                }
+            );
+
+            console.log('✅ Google Sign-In inicializado');
+        };
+
+        // Manejar la respuesta de Google Sign-In
+        async function handleCredentialResponse(response) {
+            console.log('🔑 Token recibido de Google:', response.credential);
+            
+            try {
+                showLoading(true);
+                
+                // Decodificar el JWT para obtener información del usuario
+                const userInfo = parseJwt(response.credential);
+                console.log('👤 Información del usuario:', userInfo);
+                
+                // Mostrar información del usuario
+                displayUserInfo(userInfo);
+                
+                // Enviar token al backend
+                await sendTokenToBackend(response.credential, userInfo);
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+                showResult(`Error: ${error.message}`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Enviar token al backend
+        async function sendTokenToBackend(token, userInfo) {
+            try {
+                console.log('📡 Enviando token al backend...');
+                
+                const response = await fetch(`${BACKEND_URL}/create-user`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        firebase_token: token,
+                        email: userInfo.email,
+                        nombre_completo: userInfo.name
+                    })
+                });
+
+                const result = await response.json();
+                console.log('📥 Respuesta del backend:', result);
+                
+                if (result.success) {
+                    showResult(`✅ Usuario procesado exitosamente!<br>
+                               <strong>Email:</strong> ${result.user?.email || userInfo.email}<br>
+                               <strong>UID:</strong> ${result.user?.uid}<br>
+                               <strong>Mensaje:</strong> ${result.message}`, 'success');
+                    
+                    currentUser = result.user;
+                    document.getElementById('signOut').style.display = 'inline-block';
+                } else {
+                    showResult(`⚠️ ${result.message || result.error_message}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('❌ Error enviando al backend:', error);
+                showResult(`❌ Error conectando con el backend: ${error.message}`, 'error');
+            }
+        }
+
+        // Funciones auxiliares
+        function parseJwt(token) {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(jsonPayload);
+        }
+
+        function displayUserInfo(userInfo) {
+            document.getElementById('userDetails').innerHTML = `
+                <strong>Nombre:</strong> ${userInfo.name}<br>
+                <strong>Email:</strong> ${userInfo.email}<br>
+                <strong>Foto:</strong> <img src="${userInfo.picture}" width="50" style="border-radius: 50%;"><br>
+                <strong>Google ID:</strong> ${userInfo.sub}
+            `;
+            document.getElementById('userInfo').style.display = 'block';
+        }
+
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            const contentDiv = document.getElementById('resultContent');
+            
+            resultDiv.className = `result-section ${type}`;
+            contentDiv.innerHTML = message;
+            resultDiv.style.display = 'block';
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        // Cerrar sesión
+        document.getElementById('signOut').addEventListener('click', function() {
+            google.accounts.id.disableAutoSelect();
+            currentUser = null;
+            document.getElementById('userInfo').style.display = 'none';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('signOut').style.display = 'none';
+            showResult('👋 Sesión cerrada', 'info');
+        });
+
+        // Funciones de testing
+        async function testHealth() {
+            try {
+                showLoading(true);
+                const response = await fetch(`${BACKEND_URL}/health`);
+                const result = await response.json();
+                showResult(`✅ Health Check: ${JSON.stringify(result, null, 2)}`, 'success');
+            } catch (error) {
+                showResult(`❌ Error en Health Check: ${error.message}`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function testDatabase() {
+            try {
+                showLoading(true);
+                const response = await fetch(`${BACKEND_URL}/db-test`);
+                const result = await response.json();
+                showResult(`🗄️ Database Test: ${JSON.stringify(result, null, 2)}`, 'success');
+            } catch (error) {
+                showResult(`❌ Error en Database Test: ${error.message}`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+    </script>
+</body>
+</html>

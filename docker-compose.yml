@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: user_management_db
+    restart: always
+    environment:
+      POSTGRES_DB: user_management
+      POSTGRES_USER: user_service
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - user_management_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user_service -d user_management"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  user-service:
+    build: .
+    container_name: user_management_service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: user_service
+      DB_PASSWORD: password123
+      DB_NAME: user_management
+      GRPC_URL: 0.0.0.0:50051
+    ports:
+      - "3000:3000"
+      - "50051:50051"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - user_management_network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: user_management_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    networks:
+      - user_management_network
+
+volumes:
+  postgres_data:
+
+networks:
+  user_management_network:
+    driver: bridge
