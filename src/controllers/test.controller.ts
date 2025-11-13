@@ -257,8 +257,8 @@ export class TestController {
   private isEmailAllowed(email: string): boolean {
     console.log(` Verificando si el email está permitido: ${email}`);
     
-    // Correo específico permitido
-    if (email === 'silasglauco@gmail.com') {
+    // Correos específicos permitidos
+    if (email === 'silasglauco@gmail.com' || email === 'eduardo.ericesp@gmail.com') {
       console.log(` Email específico autorizado`);
       return true;
     }
@@ -277,8 +277,8 @@ export class TestController {
   private determineUserRole(email: string): UserRole {
     console.log(` Determinando rol para email: ${email}`);
     
-    // Correo específico para rol administrativo
-    if (email === 'silasglauco@gmail.com') {
+    // Correos específicos para rol administrativo
+    if (email === 'silasglauco@gmail.com' || email === 'eduardo.ericesp@gmail.com') {
       console.log(` Email específico detectado → ADMIN`);
       return UserRole.ADMIN;
     }

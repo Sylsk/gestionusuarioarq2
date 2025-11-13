@@ -35,16 +35,10 @@ export class UserController {
   @GrpcMethod('UserService', 'ValidateUser')
   async validateUser(data: ValidateUserRequest) {
     try {
-      // gRPC convierte snake_case a camelCase automáticamente
       const token = (data as any).firebaseToken || data.firebase_token;
-      console.log(' gRPC ValidateUser called with token length:', token?.length);
-      console.log(' Token prefix:', token?.substring(0, 20) + '...');
       
       const result = await this.userService.validateUser(token);
       
-      console.log(' ValidateUser result:', { isValid: result.isValid, hasUser: !!result.user, error: result.error });
-      
-      // Si no es válido, devolver sin usuario (objeto vacío)
       if (!result.isValid || !result.user) {
         const errorResponse = {
           isValid: 0, // 0 = false
@@ -58,21 +52,10 @@ export class UserController {
           },
           errorMessage: result.error || 'Usuario no válido',
         };
-        console.log(' Returning error response:', JSON.stringify(errorResponse, null, 2));
         return errorResponse;
       }
       
-      // Si es válido, devolver datos completos
-      console.log(' Raw user data from DB:', {
-        uid: result.user.uid,
-        email: result.user.email,
-        rol: result.user.rol,
-        nombre_completo: result.user.nombre_completo,
-        created_at: result.user.created_at,
-        updated_at: result.user.updated_at,
-      });
-      
-      const response = {
+      return {
         isValid: 1, // 1 = true
         user: {
           uid: String(result.user.uid),
@@ -84,14 +67,7 @@ export class UserController {
         },
         errorMessage: "",
       };
-      
-      console.log(' Final response object:', JSON.stringify(response, null, 2));
-      
-      console.log(' Returning success response:', JSON.stringify(response, null, 2));
-      console.log(' isValid type:', typeof response.isValid, 'value:', response.isValid);
-      return response;
     } catch (error) {
-      console.error(' gRPC ValidateUser error:', error.message);
       return {
         isValid: 0, // 0 = false
         user: {
@@ -149,20 +125,27 @@ export class UserController {
       return {
         found: true,
         user: {
-          uid: user.uid,
-          email: user.email,
-          rol: user.rol,
-          nombre_completo: user.nombre_completo,
-          created_at: user.created_at.toISOString(),
-          updated_at: user.updated_at.toISOString(),
+          uid: String(user.uid || ''),
+          email: String(user.email || ''),
+          rol: String(user.rol || ''),
+          nombreCompleto: String(user.nombre_completo || ''),
+          createdAt: user.created_at ? String(user.created_at.toISOString()) : '',
+          updatedAt: user.updated_at ? String(user.updated_at.toISOString()) : '',
         },
-        error_message: '',
+        errorMessage: '',
       };
     } catch (error) {
       return {
         found: false,
-        user: null,
-        error_message: error.message,
+        user: {
+          uid: "",
+          email: "",
+          rol: "",
+          nombreCompleto: "",
+          createdAt: "",
+          updatedAt: "",
+        },
+        errorMessage: error.message,
       };
     }
   }
