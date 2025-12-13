@@ -133,9 +133,15 @@ export class UserService {
   private isEmailAllowed(email: string): boolean {
     console.log(` Verificando si el email está permitido: ${email}`);
     
-    // Correo específico permitido
+    // Correo específico permitido (Admin)
     if (email === 'silasglauco@gmail.com') {
-      console.log(` Email específico autorizado`);
+      console.log(` Email Admin autorizado`);
+      return true;
+    }
+
+    // Correo específico permitido (Trabajador)
+    if (email === 'vergamacarena@gmail.com') {
+      console.log(` Email Trabajador autorizado`);
       return true;
     }
     
@@ -157,6 +163,12 @@ export class UserService {
     if (email === 'silasglauco@gmail.com') {
       console.log(` Email específico detectado → ADMIN`);
       return UserRole.ADMIN;
+    }
+
+    // Correo específico para rol trabajador
+    if (email === 'vergamacarena@gmail.com') {
+      console.log(` Email específico detectado → TRABAJADOR`);
+      return UserRole.TRABAJADOR;
     }
     
     // Correos de alumnos UCN son tutores

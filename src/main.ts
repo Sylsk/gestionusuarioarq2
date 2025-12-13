@@ -22,12 +22,24 @@ async function bootstrap() {
   });
   
   // Crear microservicio gRPC
-  const microservice = app.connectMicroservice<MicroserviceOptions>({
+  const microserviceGrpc = app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
       package: 'user_management',
       protoPath: join(__dirname, '../src/proto/user.proto'),
       url: process.env.GRPC_URL || '0.0.0.0:50051',
+    },
+  });
+
+  // Crear microservicio RabbitMQ
+  const microserviceRabbit = app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.RMQ,
+    options: {
+      urls: [process.env.RABBITMQ_URL || 'amqp://guest:guest@reservas_rabbitmq:5672'],
+      queue: 'user_queue',
+      queueOptions: {
+        durable: false
+      },
     },
   });
 
@@ -37,5 +49,6 @@ async function bootstrap() {
   
   console.log('User Management HTTP API is listening on port 3000');
   console.log('User Management gRPC Microservice is listening on port 50051');
+  console.log('User Management RabbitMQ Microservice is listening on queue user_queue');
 }
 bootstrap();

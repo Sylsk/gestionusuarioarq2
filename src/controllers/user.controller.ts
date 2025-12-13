@@ -1,5 +1,5 @@
 import { Controller } from '@nestjs/common';
-import { GrpcMethod } from '@nestjs/microservices';
+import { Ctx, GrpcMethod, MessagePattern, Payload, RmqContext } from '@nestjs/microservices';
 import { UserService } from '../services/user.service';
 import { CreateUserDto, UpdateUserRoleDto, ValidateUserDto } from '../dto/user.dto';
 
@@ -28,9 +28,44 @@ interface DeleteUserRequest {
   uid: string;
 }
 
-@Controller()
+  @Controller()
 export class UserController {
   constructor(private readonly userService: UserService) {}
+
+  // Escuchar mensajes de RabbitMQ
+  @MessagePattern('validate_user')
+  async validateUserRabbit(@Payload() data: { uid: string }, @Ctx() context: RmqContext) {
+    const originalMsg = context.getMessage();
+    const { properties } = originalMsg;
+    console.log('RabbitMQ: Validating user with UID:', data.uid);
+    console.log('RabbitMQ Message Properties:', {
+      replyTo: properties.replyTo,
+      correlationId: properties.correlationId
+    });
+
+    try {
+      const user = await this.userService.getUserByUid(data.uid);
+      if (!user) {
+        console.log('User not found in DB');
+        return { isValid: false, message: 'User not found' };
+      }
+      console.log('User found, returning success response');
+      return { 
+        isValid: true, 
+        user: {
+          uid: user.uid,
+          email: user.email,
+          rol: user.rol,
+          nombreCompleto: user.nombre_completo
+        }
+      };
+    } catch (error) {
+      console.error('Error validating user via RabbitMQ:', error);
+      const response = { isValid: false, error: error.message };
+      console.log('Returning error response to RabbitMQ:', response);
+      return response;
+    }
+  }
 
   @GrpcMethod('UserService', 'ValidateUser')
   async validateUser(data: ValidateUserRequest) {
