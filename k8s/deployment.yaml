@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: usuarios-deployment
+  labels:
+    app: usuarios-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: usuarios-service
+  template:
+    metadata:
+      labels:
+        app: usuarios-service
+    spec:
+      containers:
+      - name: usuarios-service
+        image: dockernazzz/gestionusuarioarq2:v1
+        ports:
+        - containerPort: 3000
+        - containerPort: 50051
+        env:
+        # Configuración de Base de Datos (Postgres compartido)
+        - name: DB_HOST
+          value: "postgres-service"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_USERNAME
+          value: "user_service"
+        - name: DB_PASSWORD
+          value: "password123"
+        - name: DB_NAME
+          value: "user_management"
+        
+        # Configuración gRPC
+        - name: GRPC_URL
+          value: "0.0.0.0:50051"
+
+        # Configuración RabbitMQ (Nota: La guía menciona Kafka/NATS, verificar si RabbitMQ está disponible)
+        - name: RABBITMQ_URL
+          value: "amqp://guest:guest@rabbitmq-service:5672"
+
+        # Configuración Firebase
+        - name: FIREBASE_PROJECT_ID
+          value: "loginsalastutores"
+        - name: FIREBASE_API_KEY
+          value: "AIzaSyAW3zxRYY2t4ddtdU3YfehbhNzTfDob3YQ"
+        - name: FIREBASE_AUTH_DOMAIN
+          value: "loginsalastutores.firebaseapp.com"
+        - name: FIREBASE_APP_ID
+          value: "1:355538515261:web:92aa4016d2de359af4c154"
+        - name: FIREBASE_PRIVATE_KEY_ID
+          value: "b9fc4036d8dceb807757826dcadc9e9229b99075"
+        - name: FIREBASE_PRIVATE_KEY
+          value: "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDCdA47eOsrqy+a\noUbAXaS45r64WbdcFjAJMRZD7Q1icA9kXa1wyDZPwUKQhQSNT00uDCxTHGC0yPHC\n4RGTx9eXqf7qw01fo8i+5CyyOm3Vlz5ZC2g2Eou+SHGFgMuEi2fhv/eaGKG2yWTD\nUqhGTuLgxQEkoKO5hqsx51vMoM2NgKI+D2Si2txxrrd5hz7uzDuQZldq3R4DTKRG\nGi4PMTn4xk/bo4DxzaCZNU2O72ie/hASNdZvE9xHP/d7QFPr4sjI3cCHUbQfUzrO\ndJaEqzMLcEn/R0pvPgmNtVXtaEO6ILLZkM08SXjoni4RLI2hWSdX5zIaOZmZsimA\noeAJfmXBAgMBAAECggEADKJyT0pwy1ZU4kDy4ipjetEhWMSZjZ3ycpJyLikvqrL5\nyQ1uKMsVflKiEtZVwKHDs8d+NMs9/FknHkC1/epo93WH9vSIKTvw3fhg8BasTsnE\nNxBu7b6APnWiDKjc8GiHcCtjOOu7TC9jQO60uNbE1pJuW9UlNjeKFZTBCfdzy6sQ\nQSpdV7R8sr3WXHlHry3jhJuyjp6j9lilnyHaO0VGrTDMV3w6wp2cm0j5eXIXYCoH\noYI7rat7E1R01/h6tZydlo9Fi8rjND31Kjv2q6NzXyaIYxxpw0IVFYIvnxp5sB2k\nDKPFzfD9fdp4bnL/UA4jfsB/t2ELIiF6x4SABpIErQKBgQDfIUHOqfHvsavrhHy1\nkg/doCgXVjMPLKTsrfxx6lR5kqAmI+EqaYUhVy4Yv+0x2IbK6yfouFmc/SAAUth1\naw3peuUvXfoXIwHbXxxBaXb3eMLh4j5BPkMEANXcC1QG6Owm6jYIYdQsABRkL11q\nua6/05ziAOn1Osycy6+38SfmZQKBgQDfGVbOWCXgN3MMBmB7TAS5DGF4SZ3sklqW\nQbZW0l02kGn5i7fNcPMpEbAb4RXaelTVoVgDc9YFtRLsoF41lF2VwQQtuLLy15sR\nmZIVA4KRDjY4JSnO4YsLljSFZLnYxj5w9HXXOMQ9e3hpiCWC0i0ZYlqL+/zXzoPc\nwUDhGxXuLQKBgBoSnsfxX83savRoVNI6sRPqpQSlE+5P/y2Q3xDImvphwcjzJFp6\nXg4ZS8+kjajnbkjD1bQB5qbLhTPEenqt+cAwlhtE1fZiJtNld73E/xvHxq3ya+ff\nyKDtIBBIWpc8HGwnrgyoscw6bieOyVGxRNQxfAGErdHz/vjLbEsIKOtpAoGAYTFB\nzv056vddKITyrWRNvmw1Xlj78t9DlaglDqfwsd+yO2Px/A9T77Vj+pFRmu+mW7dB\nh6eEOtJK30lyIXd0WdRPxLdtRjxFsyIrMPppfFYrqsQN9bHuiGq0kNRz3otnEoB9\ngfiaDYrnx1nntZloymE9vzRVT5MJgTez0x2grTUCgYAxgiNxpyJOb9ll23Qjnve4\nIF8GzLb1tOUnVYtaLCYP5E/juEJoW40Jjqovg/tvFbPs6j8tAuhtptRHB+I+bjsu\nZATdx+sbI2QOuOH5bzKpmEqiEjgGe8cjySeMXyhjO9pLoSx+gucNckBqaUwY+azn\nGrooE9O6R6ypRJnCfQ/TcQ==\n-----END PRIVATE KEY-----\n"
+        - name: FIREBASE_CLIENT_EMAIL
+          value: "firebase-adminsdk-fbsvc@loginsalastutores.iam.gserviceaccount.com"
+        - name: FIREBASE_CLIENT_ID
+          value: "355538515261-0u6jtjuf1c99pm04th96h0l524a4c4e3.apps.googleusercontent.com"
+        - name: FIREBASE_CLIENT_CERT_URL
+          value: "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40loginapp-4e0b7.iam.gserviceaccount.com"

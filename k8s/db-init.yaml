@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-init-scripts
+data:
+  init.sql: |
+    -- Crear la tabla users si no existe
+    CREATE TABLE IF NOT EXISTS users (
+        uid VARCHAR(255) PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        rol VARCHAR(20) NOT NULL DEFAULT 'Tutor' CHECK (rol IN ('Tutor', 'Admin')),
+        nombre_completo VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+    CREATE INDEX IF NOT EXISTS idx_users_rol ON users(rol);
+
+  setup.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "Esperando a Postgres..."
+    until PGPASSWORD=$POSTGRES_PASSWORD psql -h $DB_HOST -U $POSTGRES_USER -d $POSTGRES_DB -c '\q'; do
+      echo "Postgres no está listo todavía..."
+      sleep 2
+    done
+    
+    echo "Postgres está listo. Verificando usuario y base de datos..."
+    
+    # Crear usuario si no existe
+    PGPASSWORD=$POSTGRES_PASSWORD psql -h $DB_HOST -U $POSTGRES_USER -d $POSTGRES_DB -tc "SELECT 1 FROM pg_roles WHERE rolname = 'user_service'" | grep -q 1 || \
+    PGPASSWORD=$POSTGRES_PASSWORD psql -h $DB_HOST -U $POSTGRES_USER -d $POSTGRES_DB -c "CREATE USER user_service WITH PASSWORD 'password123';"
+    
+    # Crear base de datos si no existe
+    PGPASSWORD=$POSTGRES_PASSWORD psql -h $DB_HOST -U $POSTGRES_USER -d $POSTGRES_DB -tc "SELECT 1 FROM pg_database WHERE datname = 'user_management'" | grep -q 1 || \
+    PGPASSWORD=$POSTGRES_PASSWORD psql -h $DB_HOST -U $POSTGRES_USER -d $POSTGRES_DB -c "CREATE DATABASE user_management OWNER user_service;"
+    
+    echo "Inicializando esquema en user_management..."
+    PGPASSWORD='password123' psql -h $DB_HOST -U user_service -d user_management -f /scripts/init.sql
+    
+    echo "¡Inicialización de base de datos completada!"
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: db-init
+        image: postgres:15-alpine
+        command: ["/bin/bash", "/scripts/setup.sh"]
+        env:
+        - name: DB_HOST
+          value: "postgres-service"
+        - name: POSTGRES_USER
+          value: "reservas_user"
+        - name: POSTGRES_PASSWORD
+          value: "reservas_password"
+        - name: POSTGRES_DB
+          value: "reservas_db"
+        volumeMounts:
+        - name: scripts-volume
+          mountPath: /scripts
+      volumes:
+      - name: scripts-volume
+        configMap:
+          name: db-init-scripts
+      restartPolicy: OnFailure

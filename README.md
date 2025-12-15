@@ -25,6 +25,48 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Despliegue en Kubernetes (Ecosistema PACE)
+
+### Requisitos Previos
+- Tener Docker instalado y corriendo.
+- Tener acceso a un clúster de Kubernetes (Minikube, Docker Desktop, etc.).
+- Tener `kubectl` configurado.
+
+### Instrucciones de Despliegue (Para Compañeros)
+
+¡Sigue estos pasos y funcionará a la primera!
+
+1. **Construir** la imagen Docker:
+   ```bash
+   docker build -t dockernazzz/gestionusuarioarq2:v1 .
+   ```
+   *(Nota: Si usas otro usuario de Docker Hub, cambia `dockernazzz` por el tuyo aquí y en `k8s/deployment.yaml`)*
+
+2. **Publicar** la imagen (Opcional si usas Minikube local):
+   ```bash
+   docker push dockernazzz/gestionusuarioarq2:v1
+   ```
+
+3. **Desplegar** la infraestructura completa:
+   Este comando levantará:
+   - **Postgres Persistente**: Base de datos con persistencia de datos.
+   - **RabbitMQ**: Sistema de mensajería.
+   - **Job de Inicialización**: Configuración automática de usuarios y tablas.
+   - **Microservicio de Usuarios**: La aplicación principal.
+   
+   ```bash
+   kubectl apply -f k8s/
+   ```
+
+   > **Nota sobre Persistencia:** Los datos se almacenan en un volumen persistente local.
+   > **Nota sobre Entorno:** Cada despliegue es independiente y utiliza su propia base de datos local.
+
+4. **Verificar** el estado de los servicios:
+   ```bash
+   kubectl get pods
+   ```
+   *Se deben observar los pods `usuarios-deployment`, `rabbitmq` y `db-init-job` (este último en estado Completed).*
+
 ## Project setup
 
 ```bash
