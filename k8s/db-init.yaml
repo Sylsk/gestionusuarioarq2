@@ -55,7 +55,7 @@ spec:
         command: ["/bin/bash", "/scripts/setup.sh"]
         env:
         - name: DB_HOST
-          value: "postgres-service"
+          value: "postgres-usuarios-service"
         - name: POSTGRES_USER
           value: "reservas_user"
         - name: POSTGRES_PASSWORD

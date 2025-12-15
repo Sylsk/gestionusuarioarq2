@@ -16,14 +16,14 @@ spec:
     spec:
       containers:
       - name: usuarios-service
-        image: dockernazzz/gestionusuarioarq2:v1
+        image: shairok/gestionusuarioarq2:v1
         ports:
         - containerPort: 3000
         - containerPort: 50051
         env:
         # Configuración de Base de Datos (Postgres compartido)
         - name: DB_HOST
-          value: "postgres-service"
+          value: "postgres-usuarios-service"
         - name: DB_PORT
           value: "5432"
         - name: DB_USERNAME
